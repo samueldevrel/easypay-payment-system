@@ -5,17 +5,37 @@ module pyment::pyment{
     use sui::balance::{Balance,zero};
     use sui::sui::SUI;
     use sui::coin::{Coin,split, put,take};
+    use sui::event;
     //define errors
     const ONLYOWNERISALOWED:u64=0;
     const SERVICENOTAVAIALBLE:u64=1;
     const INSUFFICIENTBALANCE:u64=2;
+    const EINVALIDRATING:u64=3;
+
+
+    //define data types
+
     public struct PayEasy has key,store{
         id:UID,
         payeasyid:ID,
         nameofcompany:String,
         services:vector<Service>,
         balance:Balance<SUI>,
+        rates:vector<Rate>,
+        enquiries:vector<Enquiry>
 
+
+    }
+    public struct Rate has store,key{
+        id:UID,
+        rate:u64,
+        by:address
+    }
+
+    public struct Enquiry has key,store{
+        id:UID,
+        by:address,
+        enquiry:String
     }
 
     public struct Service has store{
@@ -32,6 +52,33 @@ module pyment::pyment{
         id:UID,
         payeasyid:ID
     }
+
+    //define events
+
+    public struct RateAdded has copy,drop{
+        by:address,
+        rating:u64
+    }
+
+    public struct EnquirySubmitted has copy,drop{
+        by:address,
+        enquiry:String
+    }
+
+    public struct CompanyAdded has copy,drop{
+        id:ID,
+        name:String
+    }
+
+    public struct ServiceAdded has copy,drop{
+        nameofservice:String,
+        description:String
+    }
+
+    public  struct WithdrawAmount has copy,drop{
+        amount:u64,
+        recipient:address
+    }
     //integrate payeasy into your daap
     public entry fun integrate_pay_easy(nameofcompany:String,ctx:&mut TxContext){
 
@@ -47,7 +94,9 @@ module pyment::pyment{
             payeasyid,
             nameofcompany,
             services:vector::empty(),
-            balance:zero<SUI>()
+            balance:zero<SUI>(),
+            rates:vector::empty(),
+            enquiries:vector::empty()
         };
 
         //transfer the capablities to the owner of the company
@@ -56,20 +105,26 @@ module pyment::pyment{
          id: object::new(ctx),
           payeasyid,
     }, tx_context::sender(ctx));
-        //share your company
 
-        transfer::share_object(new_company);
+    //emit event
+     
+     event::emit(CompanyAdded{
+        id:payeasyid,
+        name:nameofcompany
+     });
+    //share your company
+    transfer::share_object(new_company);
     }
 
 
     //add the services the comp[any is offering the amount charging of the service package
 
 
-    public entry fun add_services_of_company(company:&mut PayEasy,owner:&OwnerCap,name:String,description:String,amount:u64,ctx:&mut TxContext){
+    public entry fun add_services_of_company(company:&mut PayEasy,owner:&OwnerCap,name:String,description:String,amount:u64,_ctx:&mut TxContext){
 
         //verify to make sure its only the owner integrating the payeasy can perform the action
 
-        assert!(owner.payeasyid==company.payeasyid,ONLYOWNERISALOWED);
+        assert!(&owner.payeasyid==object::uid_as_inner(&company.id),ONLYOWNERISALOWED);
 
         //get the length of services inorder to create  a unique id
 
@@ -86,6 +141,13 @@ module pyment::pyment{
         //add new service to company
 
         company.services.push_back(newservice);
+
+        //emit event
+
+        event::emit(ServiceAdded{
+            nameofservice:name,
+            description
+        });
     }
 
     //users pay for the services and get the receipt
@@ -108,12 +170,59 @@ module pyment::pyment{
 
     }
 
-    //owner withdraw all amount available
+//rate pyeasy
 
-    //owner withdraw sepceifc amount
+  public entry fun rate_pay_easy(company:&mut PayEasy,rating:u64,ctx:&mut TxContext){
 
-    //get services offred by the company
-    //owener withdraw all funds
+    //ensure rate is greater than zero and is less than 6
+
+       assert!(rating >0 && rating < 6,EINVALIDRATING);
+      //rate
+      let new_rate=Rate{
+        id:object::new(ctx),
+        rate:rating,
+        by:tx_context::sender(ctx)
+      };
+      //update vector rates
+      company.rates.push_back(new_rate);
+
+      //emit event
+
+      event::emit(RateAdded{
+        by:tx_context::sender(ctx),
+        rating
+      });
+  }
+    
+
+//enquire about a service
+
+ public entry fun payeasy_enquire(company:&mut PayEasy,enquire:String,ctx:&mut TxContext){
+    
+     //create a new enquiry
+     let new_enquiry=Enquiry{
+        id:object::new(ctx),
+        by:tx_context::sender(ctx),
+        enquiry:enquire
+     };
+
+     //add enquiry to vector of enquiries
+
+     company.enquiries.push_back(new_enquiry);
+
+
+     //emit event
+
+     event::emit(EnquirySubmitted{
+        by:tx_context::sender(ctx),
+        enquiry:enquire
+     });
+
+ }
+
+
+ //withdraw funds from payeasy
+
  public entry fun withdraw_all_funds(
         owner: &OwnerCap,         
         company: &mut PayEasy,
@@ -121,13 +230,19 @@ module pyment::pyment{
         ctx: &mut TxContext,
     ) {
         //ensure its the owner performing the action
-        assert!(owner.payeasyid==company.payeasyid,ONLYOWNERISALOWED);
+        assert!(&owner.payeasyid==object::uid_as_inner(&company.id),ONLYOWNERISALOWED);
 
         
         let allamount=company.balance.value();
         
         let takeall = take(&mut company.balance, allamount, ctx); 
         transfer::public_transfer(takeall, recipient);  
+
+        //emit event
+         event::emit(WithdrawAmount{
+            amount:allamount,
+            recipient
+        });
        
     }
 
@@ -146,15 +261,18 @@ module pyment::pyment{
 
       //ensure its the owener performing the action
 
-        assert!(owner.payeasyid==company.payeasyid,ONLYOWNERISALOWED);
+       assert!(&owner.payeasyid==object::uid_as_inner(&company.id),ONLYOWNERISALOWED);
 
-        let balance=company.balance.value();
         
         let takeamount = take(&mut company.balance, amount, ctx);
         transfer::public_transfer(takeamount, recipient);
        
-        
+        //emit event
+
+        event::emit(WithdrawAmount{
+            amount,
+            recipient
+        });
     }
 
 }
-
