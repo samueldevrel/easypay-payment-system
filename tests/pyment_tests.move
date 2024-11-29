@@ -1,18 +1,32 @@
-/*
 #[test_only]
-module pyment::pyment_tests;
-// uncomment this line to import the module
-// use pyment::pyment;
+module pyment::test {
+    use sui::test_scenario::{Self as ts, next_tx};
+    use sui::coin::{mint_for_testing};
+    use sui::sui::{SUI};
 
-const ENotImplemented: u64 = 0;
+    use std::string::{Self, String};
+    use std::debug::print;
 
-#[test]
-fun test_pyment() {
-    // pass
+    use pyment::helpers::init_test_helper;
+    use pyment::pyment::{Self as payment};
+
+    const ADMIN: address = @0xe;
+    const TEST_ADDRESS1: address = @0xee;
+    const TEST_ADDRESS2: address = @0xbb;
+
+   #[test]
+    public fun test1() {
+        let mut scenario_test = init_test_helper();
+        let scenario = &mut scenario_test;
+
+        // create agent
+        next_tx(scenario, TEST_ADDRESS1);
+        {
+       
+        };
+
+        ts::end(scenario_test);
+    }
+
+
 }
-
-#[test, expected_failure(abort_code = ::pyment::pyment_tests::ENotImplemented)]
-fun test_pyment_fail() {
-    abort ENotImplemented
-}
-*/
