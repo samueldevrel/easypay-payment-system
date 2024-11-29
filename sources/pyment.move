@@ -163,7 +163,7 @@ module pyment::pyment;
     }
 
     //rate pyeasy
-    public entry fun rate_pay_easy(company: &mut PayEasy, rate: ID, rating: u64, ctx: &mut TxContext) {
+    public entry fun rate_pay_easy(company: &mut PayEasy, service_id: ID, rating: u64, ctx: &mut TxContext) {
         //ensure rate is greater than zero and is less than 6
         assert!(rating >0 && rating < 6, EINVALIDRATING);
         //rate
@@ -175,12 +175,12 @@ module pyment::pyment;
         // take the table 
         let table1 = &mut company.rates;
         // check if there is no field 
-        if(!table::contains(table1, rate)) {
+        if(!table::contains(table1, service_id)) {
             let new_table = table::new<address, Rate>(ctx);
-            table::add(table1, rate, new_table);
+            table::add(table1, service_id, new_table);
         };
         // borrow child table 
-        let child_table = table::borrow_mut(&mut company.rates, rate);
+        let child_table = table::borrow_mut(&mut company.rates, service_id);
         // add rate object to child table 
         child_table.add(ctx.sender(), new_rate);
        
