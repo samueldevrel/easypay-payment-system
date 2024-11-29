@@ -157,15 +157,11 @@ module pyment::pyment;
 
     public entry fun pay_for_service(
         company: &mut PayEasy,
-        serviceid: u64,
+        serviceid: ID,
         amount: &mut Coin<SUI>,
         ctx: &mut TxContext,
     ) {
-        //verify the the service user is trying to pay is available
-
-        assert!(company.services.length()>=serviceid, SERVICENOTAVAIALBLE);
         //verify the user has sufficient amount to perform the transaction
-
         assert!(company.services[serviceid].amounttobepaid>=amount.value(), INSUFFICIENTBALANCE);
 
         let amounttopay = company.services[serviceid].amounttobepaid;
@@ -177,7 +173,7 @@ module pyment::pyment;
 
     //rate pyeasy
 
-    public entry fun rate_pay_easy(company: &mut PayEasy, rating: u64, ctx: &mut TxContext) {
+    public entry fun rate_pay_easy(company: &mut PayEasy, rate: ID, rating: u64, ctx: &mut TxContext) {
         //ensure rate is greater than zero and is less than 6
 
         assert!(rating >0 && rating < 6, EINVALIDRATING);
@@ -187,11 +183,19 @@ module pyment::pyment;
             rate: rating,
             by: tx_context::sender(ctx),
         };
-        //update vector rates
-        company.rates.push_back(new_rate);
-
+        // take the table 
+        let mut table1 = &mut company.rates;
+        // check if there is no field 
+        if(!table::contains(table1, rate)) {
+            let new_table = table::new<address, Rate>(ctx);
+            table::add(table1, rate, new_table);
+        };
+        // borrow child table 
+        let mut child_table = table::borrow_mut(&mut company.rates, rate);
+        // add rate object to child table 
+        child_table.add(ctx.sender(), new_rate);
+       
         //emit event
-
         event::emit(RateAdded {
             by: tx_context::sender(ctx),
             rating,
@@ -199,7 +203,6 @@ module pyment::pyment;
     }
 
     //enquire about a service
-
     public entry fun payeasy_enquire(company: &mut PayEasy, enquire: String, ctx: &mut TxContext) {
         //create a new enquiry
         let new_enquiry = Enquiry {
