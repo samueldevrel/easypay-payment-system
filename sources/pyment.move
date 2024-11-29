@@ -117,7 +117,6 @@ module pyment::pyment;
     }
 
     //add the services the comp[any is offering the amount charging of the service package
-
     public entry fun add_services_of_company(
         company: &mut PayEasy,
         owner: &OwnerCap,
@@ -127,13 +126,7 @@ module pyment::pyment;
         ctx: &mut TxContext,
     ) {
         //verify to make sure its only the owner integrating the payeasy can perform the action
-
         assert!(&owner.payeasyid==object::uid_as_inner(&company.id), ONLYOWNERISALOWED);
-
-        //get the length of services inorder to create  a unique id
-
-        let id: u64 = company.services.length();
-
         //create a new service
         let newservice = Service {
             id: object::new(ctx),
@@ -146,7 +139,6 @@ module pyment::pyment;
         company.services.add(id_, newservice);
 
         //emit event
-
         event::emit(ServiceAdded {
             nameofservice: name,
             description,
@@ -154,7 +146,6 @@ module pyment::pyment;
     }
 
     //users pay for the services and get the receipt
-
     public entry fun pay_for_service(
         company: &mut PayEasy,
         serviceid: ID,
@@ -172,10 +163,8 @@ module pyment::pyment;
     }
 
     //rate pyeasy
-
     public entry fun rate_pay_easy(company: &mut PayEasy, rate: ID, rating: u64, ctx: &mut TxContext) {
         //ensure rate is greater than zero and is less than 6
-
         assert!(rating >0 && rating < 6, EINVALIDRATING);
         //rate
         let new_rate = Rate {
@@ -242,8 +231,7 @@ module pyment::pyment;
         });
     }
 
-    //owener widthradw specific funds
-
+    //owner widthradw specific funds
     public entry fun withdraw_specific_funds(
         owner: &OwnerCap,
         company: &mut PayEasy,
