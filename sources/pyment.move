@@ -23,7 +23,7 @@ module pyment::pyment;
         services: Table<ID, Service>,
         balance: Balance<SUI>,
         rates: Table<ID, Table<address, Rate>>,
-        enquiries: vector<Enquiry>,
+        enquiries: Table<address, Enquiry>,
     }
     public struct Rate has store, key {
         id: UID,
@@ -93,7 +93,7 @@ module pyment::pyment;
             services: table::new(ctx),
             balance: zero<SUI>(),
             rates: table::new(ctx),
-            enquiries: vector::empty(),
+            enquiries: table::new(ctx),
         };
 
         //transfer the capablities to the owner of the company
@@ -184,14 +184,14 @@ module pyment::pyment;
             by: tx_context::sender(ctx),
         };
         // take the table 
-        let mut table1 = &mut company.rates;
+        let table1 = &mut company.rates;
         // check if there is no field 
         if(!table::contains(table1, rate)) {
             let new_table = table::new<address, Rate>(ctx);
             table::add(table1, rate, new_table);
         };
         // borrow child table 
-        let mut child_table = table::borrow_mut(&mut company.rates, rate);
+        let child_table = table::borrow_mut(&mut company.rates, rate);
         // add rate object to child table 
         child_table.add(ctx.sender(), new_rate);
        
@@ -210,13 +210,9 @@ module pyment::pyment;
             by: tx_context::sender(ctx),
             enquiry: enquire,
         };
-
         //add enquiry to vector of enquiries
-
-        company.enquiries.push_back(new_enquiry);
-
+        company.enquiries.add(ctx.sender(), new_enquiry);
         //emit event
-
         event::emit(EnquirySubmitted {
             by: tx_context::sender(ctx),
             enquiry: enquire,
