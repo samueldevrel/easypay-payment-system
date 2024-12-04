@@ -8,9 +8,8 @@ module pyment::pyment{
     use sui::event;
     //define errors
     const ONLYOWNERISALOWED:u64=0;
-    const SERVICENOTAVAIALBLE:u64=1;
-    const INSUFFICIENTBALANCE:u64=2;
-    const EINVALIDRATING:u64=3;
+    const INSUFFICIENTBALANCE:u64=1;
+    const EINVALIDRATING:u64=2;
 
 
     //define data types
@@ -30,6 +29,12 @@ module pyment::pyment{
         id:UID,
         rate:u64,
         by:address
+    }
+   public  struct Receipt has key, store {
+        id:UID,
+        service_id: u64,
+        amount_paid: u64,
+        user: address,
     }
 
     public struct Enquiry has key,store{
@@ -82,7 +87,7 @@ module pyment::pyment{
     //integrate payeasy into your daap
     public entry fun integrate_pay_easy(nameofcompany:String,ctx:&mut TxContext){
 
-        //genrate uniques ids
+        //generate unique id
         let id=object::new(ctx);
         //genarete payid
         let payeasyid=object::uid_to_inner(&id);
@@ -117,19 +122,19 @@ module pyment::pyment{
     }
 
 
-    //add the services the comp[any is offering the amount charging of the service package
+    //add the services the company is offering and the amount charging for the service offering
 
 
-    public entry fun add_services_of_company(company:&mut PayEasy,owner:&OwnerCap,name:String,description:String,amount:u64,_ctx:&mut TxContext){
+    public entry fun add_services_of_company(company:&mut PayEasy,owner:&OwnerCap,name:String,description:String,amount:u64,ctx:&mut TxContext){
 
-        //verify to make sure its only the owner integrating the payeasy can perform the action
+        //verify to make sure its only the owner integrating the payeasy 
 
         assert!(&owner.payeasyid==object::uid_as_inner(&company.id),ONLYOWNERISALOWED);
 
-        //get the length of services inorder to create  a unique id
+        //create a unique id
 
-        let id:u64=company.services.length();
-
+       let timestamp = ctx.epoch_timestamp_ms();
+       let id = timestamp + (company.services.length() as u64);
         //create a new service
         let newservice=Service{
             id,
@@ -154,18 +159,41 @@ module pyment::pyment{
 
     public entry fun pay_for_service(company:&mut PayEasy,serviceid:u64,amount:&mut Coin<SUI>,ctx:&mut TxContext){
 
-        //verify the the service user is trying to pay is available
 
-        assert!(company.services.length()>=serviceid,SERVICENOTAVAIALBLE);
-        //verify the user has sufficient amount to perform the transaction
+        let mut index:u64=0;
+        let user = tx_context::sender(ctx);
+        let serviceslength:u64=company.services.length();
+        while(index < serviceslength){
 
-        assert!(company.services[serviceid].amounttobepaid>=amount.value(),INSUFFICIENTBALANCE);
+            let service=&company.services[index];
 
-        let amounttopay=company.services[serviceid].amounttobepaid;
+            if(service.id==serviceid){
+                 //verify the user has sufficient amount to perform the transaction
 
-        let pay=amount.split(amounttopay,ctx);
+                assert!(amount.value()>=company.services[index].amounttobepaid,INSUFFICIENTBALANCE);
+
+                let amounttopay=company.services[index].amounttobepaid;
+
+                let pay=amount.split(amounttopay,ctx);
          
-          put(&mut company.balance, pay); 
+                 put(&mut company.balance, pay); 
+                  // Generate a receipt
+                let receipt = Receipt {
+                  id:object::new(ctx),
+                  service_id: serviceid,
+                  amount_paid: amounttopay,
+                  user,
+            };
+
+            // Transfer the receipt to the user
+            transfer::public_transfer(receipt, user);
+            return
+
+            };
+            index=index+1;
+        };
+        abort 0
+       
 
 
     }
@@ -246,7 +274,7 @@ module pyment::pyment{
        
     }
 
-  //owener widthradw specific funds
+  //owner widthdraw specific funds
  
    public entry fun withdraw_specific_funds(
         owner: &OwnerCap,      
@@ -257,7 +285,7 @@ module pyment::pyment{
     ) {
 
         //verify amount is sufficient
-      assert!(amount > 0 && amount <= company.balance.value(), INSUFFICIENTBALANCE);
+      assert!(amount <= company.balance.value(), INSUFFICIENTBALANCE);
 
       //ensure its the owener performing the action
 
