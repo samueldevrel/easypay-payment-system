@@ -198,7 +198,7 @@ module pyment::pyment{
 
     }
 
-//rate pyeasy
+//rate payeasy
 
   public entry fun rate_pay_easy(company:&mut PayEasy,rating:u64,ctx:&mut TxContext){
 
@@ -287,7 +287,7 @@ module pyment::pyment{
         //verify amount is sufficient
       assert!(amount <= company.balance.value(), INSUFFICIENTBALANCE);
 
-      //ensure its the owener performing the action
+      //ensure its the owner performing the action
 
        assert!(&owner.payeasyid==object::uid_as_inner(&company.id),ONLYOWNERISALOWED);
 
